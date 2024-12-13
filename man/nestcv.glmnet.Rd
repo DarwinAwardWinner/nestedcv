@@ -26,7 +26,6 @@ nestcv.glmnet(
   outer_train_predict = FALSE,
   weights = NULL,
   penalty.factor = rep(1, ncol(x)),
-  cv.cores = 1,
   finalCV = TRUE,
   na.option = "omit",
   verbose = FALSE,
@@ -112,10 +111,6 @@ that variable is always included in the model. Default is 1 for all
 variables. See \link[glmnet:glmnet]{glmnet::glmnet}. Note this works separately from filtering.
 For some \code{nestedcv} filter functions you might need to set \code{force_vars} to
 avoid filtering out features.}
-
-\item{cv.cores}{Number of cores for parallel processing of the outer loops.
-NOTE: this uses \code{parallel::mclapply} on unix/mac and \code{parallel::parLapply}
-on windows.}
 
 \item{finalCV}{Logical whether to perform one last round of CV on the whole
 dataset to determine the final model parameters. If set to \code{FALSE}, the
@@ -208,8 +203,7 @@ predSummary(output)
 fit2 <- nestcv.glmnet(y, x, family = "binomial", alphaSet = 1,
                       n_outer_folds = 3,
                       filterFUN = ttest_filter,
-                      filter_options = list(nfilter = 100),
-                      cv.cores = 2)
+                      filter_options = list(nfilter = 100))
 summary(fit2)
 plot_lambdas(fit2, showLegend = "bottomright")
 
@@ -220,8 +214,8 @@ inroc <- innercv_roc(fit2)
 plot(fit2$roc)
 lines(inroc, col = 'blue')
 lines(testroc, col = 'red')
-legend('bottomright', legend = c("Nested CV", "Left-out inner CV folds", 
-                                 "Test partition, non-nested filtering"), 
+legend('bottomright', legend = c("Nested CV", "Left-out inner CV folds",
+                                 "Test partition, non-nested filtering"),
        col = c("black", "blue", "red"), lty = 1, lwd = 2, bty = "n")
 }
 }

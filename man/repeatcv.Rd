@@ -10,8 +10,9 @@ repeatcv(
   repeat_folds = NULL,
   keep = FALSE,
   extra = FALSE,
-  progress = TRUE,
-  rep.cores = 1L
+  progress,
+  rep.cores,
+  allow_multithreading = if (is(plan(), "sequential")) TRUE else FALSE
 )
 }
 \arguments{
@@ -30,13 +31,18 @@ large.}
 \item{extra}{Logical whether additional performance metrics are gathered for
 binary classification models. See \code{\link[=metrics]{metrics()}}.}
 
-\item{progress}{Logical whether to show progress.}
+\item{progress}{(Ignored for backward-compatibilty.)}
 
-\item{rep.cores}{Integer specifying number of cores/threads to invoke.}
+\item{rep.cores}{(Ignored for backward-compatibilty. Use \code{\link[future:plan]{future::plan()}}
+instead.)}
+
+\item{allow_multithreading}{Logical whether to enable (TRUE) or disable
+(FALSE) multithreading for caret models that are able to use it. It is
+generally recommended to disable multithreading when using multiplke
+processes.}
 }
 \value{
-List of S3 class 'repeatcv' containing:
-\item{call}{the model call}
+List of S3 class 'repeatcv' containing: \item{call}{the model call}
 \item{result}{matrix of performance metrics}
 \item{output}{a matrix or dataframe containing the outer CV predictions from
 each repeat}
@@ -55,15 +61,13 @@ We recommend using this with the R pipe \verb{|>} (see examples).
 
 When comparing models, it is recommended to fix the sets of outer CV folds
 used across each repeat for comparing performance between models. The
-function \code{\link[=repeatfolds]{repeatfolds()}} can be used to create a fixed set of outer CV folds
-for each repeat.
+function \code{\link[=repeatfolds]{repeatfolds()}} can be used to create a fixed set of outer CV
+folds for each repeat.
 
-Parallelisation over repeats is performed using \code{parallel::mclapply} (not
-available on windows). Beware that \code{cv.cores} can still be set within calls
-to \code{nestedcv} models (= nested parallelisation). This means that \code{rep.cores}
-x \code{cv.cores} number of processes/forks will be spawned, so be careful not to
-overload your CPU. In general parallelisation of repeats using \code{rep.cores} is
-faster than parallelisation using \code{cv.cores}.
+Parallelisation over repeats is performed using
+\code{\link[future.apply:future_apply]{future.apply::future_apply()}}, following the normal rules for nested
+parallelisation. In general parallelisation of the repeats is faster than
+parallelisation of the nested CV.
 }
 \examples{
 \donttest{
@@ -74,7 +78,7 @@ x <- dat[, 1:4]
 
 res <- nestcv.glmnet(y, x, family = "multinomial", alphaSet = 1,
                      n_outer_folds = 4) |>
-       repeatcv(3, rep.cores = 2)
+       repeatcv(3)
 res
 summary(res)
 
@@ -83,7 +87,7 @@ set.seed(123, "L'Ecuyer-CMRG")
 folds <- repeatfolds(y, repeats = 3, n_outer_folds = 4)
 res <- nestcv.glmnet(y, x, family = "multinomial", alphaSet = 1,
                      n_outer_folds = 4) |>
-       repeatcv(3, repeat_folds = folds, rep.cores = 2)
+       repeatcv(3, repeat_folds = folds)
 res
 }
 }

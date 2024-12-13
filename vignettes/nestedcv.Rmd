@@ -89,6 +89,13 @@ install.packages("nestedcv")
 library(nestedcv)
 ```
 
+# Parallel setup
+
+```{r}
+library(future)
+plan(multisession)
+```
+
 # Examples
 
 ### Importance of nested CV
@@ -217,7 +224,7 @@ data.rtx <- data[metadata$Randomised.medication == "Rituximab", ]
 
 # no filter
 res.rtx <- nestcv.glmnet(y = yrtx, x = data.rtx,
-                         family = "binomial", cv.cores = 8,
+                         family = "binomial",
                          alphaSet = seq(0.7, 1, 0.05))
 res.rtx
 ```
@@ -259,7 +266,7 @@ function are passed as a list through `filter_options`.
 # t-test filter
 res.rtx <- nestcv.glmnet(y = yrtx, x = data.rtx, filterFUN = ttest_filter,
                          filter_options = list(nfilter = 300, p_cutoff = NULL),
-                         family = "binomial", cv.cores = 8,
+                         family = "binomial",
                          alphaSet = seq(0.7, 1, 0.05))
 summary(res.rtx)
 ```
@@ -320,7 +327,7 @@ Leave-one-out cross-validation (LOOCV) can be performed on the outer folds.
 res.rtx <- nestcv.glmnet(y = yrtx, x = data.rtx, min_1se = 0, filterFUN = ttest_filter,
                          filter_options = list(nfilter = 300, p_cutoff = NULL),
                          outer_method = "LOOCV",
-                         family = "binomial", cv.cores = 8,
+                         family = "binomial",
                          alphaSet = seq(0.7, 1, 0.05))
 summary(res.rtx)
 ```
@@ -370,14 +377,14 @@ Multiple filters for variable reduction are available including:
 # Random forest filter
 res.rtx <- nestcv.glmnet(y = yrtx, x = data.rtx, min_1se = 0.5, filterFUN = rf_filter,
                          filter_options = list(nfilter = 300),
-                         family = "binomial", cv.cores = 8, 
+                         family = "binomial", 
                          alphaSet = seq(0.7, 1, 0.05))
 summary(res.rtx)
 
 # ReliefF algorithm filter
 res.rtx <- nestcv.glmnet(y = yrtx, x = data.rtx, min_1se = 0, filterFUN = relieff_filter,
                          filter_options = list(nfilter = 300),
-                         family = "binomial", cv.cores = 8, 
+                         family = "binomial", 
                          alphaSet = seq(0.7, 1, 0.05))
 summary(res.rtx)
 ```
@@ -449,7 +456,7 @@ impute_x <- function(x, ...) {
 
 res <- nestcv.glmnet(y, x_na, family = "gaussian",
                      alphaSet = 1, 
-                     n_outer_folds = 3, cv.cores = 2,
+                     n_outer_folds = 3,
                      modifyX = impute_x,
                      na.option = "pass")
 ```
@@ -486,7 +493,7 @@ predict.modxy <- function(object, newdata, ...) {
 }
 
 res <- nestcv.glmnet(y, x, family = "gaussian", alphaSet = 1,
-                     n_outer_folds = 3, cv.cores = 3,
+                     n_outer_folds = 3,
                      modifyX = modxy, modifyX_useY = TRUE)
 ```
 
@@ -561,7 +568,6 @@ table(y2)
 ## whole dataset
 fit1 <- nestcv.glmnet(y2, x2, family = "binomial", alphaSet = 1,
                       n_outer_folds = 4,
-                      cv.cores=2,
                       filterFUN = ttest_filter)
 fit1$summary
 ```
@@ -579,7 +585,6 @@ table(y2)
 ## whole dataset
 fit1b <- nestcv.glmnet(y2, x2, family = "binomial", alphaSet = 1,
                        n_outer_folds = 4,
-                       cv.cores=2,
                        filterFUN = ttest_filter)
 fit1b$summary
 
@@ -592,7 +597,6 @@ table(y2)
 ## Nested CV glmnet with unnested balancing by SMOTE on whole dataset
 fit2 <- nestcv.glmnet(y2, x2, family = "binomial", alphaSet = 1,
                       n_outer_folds = 4,
-                      cv.cores=2,
                       filterFUN = ttest_filter)
 fit2$summary
 ```
@@ -604,7 +608,6 @@ within the outer CV loop, using `nestcv.glmnet()`.
 ## Nested CV glmnet with nested balancing by random oversampling
 fit3 <- nestcv.glmnet(y, x, family = "binomial", alphaSet = 1,
                       n_outer_folds = 4,
-                      cv.cores=2,
                       balance = "randomsample",
                       filterFUN = ttest_filter)
 fit3$summary
@@ -623,7 +626,6 @@ table(w)
 
 fit4 <- nestcv.glmnet(y, x, family = "binomial", alphaSet = 1,
                       n_outer_folds = 4,
-                      cv.cores=2,
                       weights = w,
                       filterFUN = ttest_filter)
 fit4$summary
@@ -685,7 +687,7 @@ ncv <- nestcv.train(y = yrtx, x = data.rtx,
                method = "glmnet",
                savePredictions = "final",
                filterFUN = ttest_filter, filter_options = list(nfilter = 300),
-               tuneGrid = tg, cv.cores = 8)
+               tuneGrid = tg)
 ncv$summary
 
 # Plot ROC on outer folds
@@ -764,7 +766,6 @@ in_folds <- lapply(out_folds, function(i) {
 })
 
 res <- nestcv.train(y, x, method = "rf",
-                    cv.cores = 8,
                     inner_folds = in_folds,
                     outer_folds = out_folds)
 summary(res)
@@ -803,7 +804,7 @@ y <- Sonar$Class
 x <- Sonar[, -61]
 
 fit1 <- nestcv.glmnet(y, x, family = "binomial", alphaSet = 1,
-                      n_outer_folds = 4, cv.cores = 2)
+                      n_outer_folds = 4)
 
 metrics(fit1, extra = TRUE)
 ```
@@ -859,13 +860,13 @@ x <- Sonar[, -61]
 
 # single fit
 fit <- nestcv.glmnet(y, x, family = "binomial", alphaSet = 1,
-                     n_outer_folds = 4, cv.cores = 2)
+                     n_outer_folds = 4)
 
 # repeated nested CV
 set.seed(123, "L'Ecuyer-CMRG")
 repcv <- nestcv.glmnet(y, x, family = "binomial", alphaSet = 1,
                        n_outer_folds = 4) |>
-         repeatcv(8, rep.cores = 2)
+         repeatcv(8)
 ```
 ```{r}
 repcv
@@ -882,7 +883,7 @@ folds <- repeatfolds(y, repeats = 3, n_outer_folds = 4)
 
 repcv <- nestcv.glmnet(y, x, family = "binomial", alphaSet = 1,
                        n_outer_folds = 4) |>
-         repeatcv(3, repeat_folds = folds, rep.cores = 2)
+         repeatcv(3, repeat_folds = folds)
 repcv
 ```
 

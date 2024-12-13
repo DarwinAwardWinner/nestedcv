@@ -40,6 +40,8 @@ is set to 1, which is the equivalent of specifying `s = "lambda.1se"` with
 ```{r}
 library(nestedcv)
 library(mlbench)  # Boston housing dataset
+library(future)
+plan(multisession)
 
 data(BostonHousing2)
 dat <- BostonHousing2
@@ -49,7 +51,7 @@ x <- subset(dat, select = -c(cmedv, medv, town, chas))
 # Fit a glmnet model using nested CV
 set.seed(1, "L'Ecuyer-CMRG")
 fit <- nestcv.glmnet(y, x, family = "gaussian",
-                     min_1se = 1, alphaSet = 1, cv.cores = 2)
+                     min_1se = 1, alphaSet = 1)
 vs <- var_stability(fit)
 vs
 ```
@@ -187,7 +189,7 @@ The process for a caret model fitted using `nestedcv` is similar. Use the
 # Only 3 outer folds to speed up process
 fit <- nestcv.train(y, x,
                     method = "gbm",
-                    n_outer_folds = 3, cv.cores = 2)
+                    n_outer_folds = 3)
 
 # Only using 5 repeats here for speed, but recommend higher values of nsim
 sh <- explain(fit, X=x, pred_wrapper = pred_train, nsim = 5)
