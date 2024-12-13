@@ -46,7 +46,7 @@
 #' @examples
 #' ## sigmoid function
 #' sigmoid <- function(x) {1 / (1 + exp(-x))}
-#' 
+#'
 #' ## load iris dataset and simulate a binary outcome
 #' data(iris)
 #' dt <- iris[, 1:4]
@@ -54,7 +54,7 @@
 #' dt <- as.data.frame(apply(dt, 2, scale))
 #' y2 <- sigmoid(0.5 * dt$marker1 + 2 * dt$marker2) > runif(nrow(dt))
 #' y2 <- factor(y2, labels = c("C1", "C2"))
-#' 
+#'
 #' ttest_filter(y2, dt)  # returns index of filtered predictors
 #' ttest_filter(y2, dt, type = "name")  # shows names of predictors
 #' ttest_filter(y2, dt, type = "full")  # full results table
@@ -93,7 +93,7 @@ ttest_filter <- function(y,
     } else return(res[-factor_ind, ])
   }
   filter_end(res[, "pvalue"],
-             x, force_vars, nfilter, p_cutoff, rsq_cutoff, type, keep_factors, 
+             x, force_vars, nfilter, p_cutoff, rsq_cutoff, type, keep_factors,
              factor_ind, ...)
 }
 
@@ -126,7 +126,7 @@ filter_end <- function(pval, x, force_vars, nfilter, p_cutoff, rsq_cutoff,
 #' @rdname ttest_filter
 #' @importFrom matrixTests col_oneway_welch
 #' @export
-#' 
+#'
 anova_filter <- function(y,
                          x,
                          force_vars = NULL,
@@ -148,7 +148,7 @@ anova_filter <- function(y,
     } else return(res[-factor_ind, ])
   }
   filter_end(res[, "pvalue"],
-             x, force_vars, nfilter, p_cutoff, rsq_cutoff, type, keep_factors, 
+             x, force_vars, nfilter, p_cutoff, rsq_cutoff, type, keep_factors,
              factor_ind, ...)
 }
 
@@ -156,7 +156,7 @@ anova_filter <- function(y,
 #' @rdname ttest_filter
 #' @importFrom matrixTests row_wilcoxon_twosample
 #' @export
-#' 
+#'
 wilcoxon_filter <- function(y,
                             x,
                             force_vars = NULL,
@@ -190,22 +190,22 @@ wilcoxon_filter <- function(y,
 
 #' Correlation between a vector and a matrix
 #'
-#' Fast Pearson/Spearman correlation where `y` is vector, `x` is matrix, adapted 
+#' Fast Pearson/Spearman correlation where `y` is vector, `x` is matrix, adapted
 #' from [stats::cor.test].
-#' 
+#'
 #' @param y Numerical vector
 #' @param x Matrix
 #' @param method Type of correlation, either "pearson" or "spearman".
-#' @param use Optional character string giving a method for computing 
+#' @param use Optional character string giving a method for computing
 #' covariances in the presence of missing values. See [cor]
-#' @details For speed, p-values for Spearman's test are computed by 
+#' @details For speed, p-values for Spearman's test are computed by
 #' asymptotic t approximation, equivalent to [cor.test] with `exact = FALSE`.
 #' @return Matrix with columns containing the correlation statistic, either
 #'   Pearson r or Spearman rho, and p-values for each column of `x` correlated
 #'   against vector `y`
 #' @importFrom stats complete.cases cor pt
 #' @export
-#' 
+#'
 correls2 <- function(y, x,
                      method = "pearson",
                      use = "complete.obs") {
@@ -236,7 +236,7 @@ correls2 <- function(y, x,
 
 #' @rdname ttest_filter
 #' @export
-#' 
+#'
 correl_filter <- function(y,
                           x,
                           method = "pearson",
@@ -263,22 +263,22 @@ correl_filter <- function(y,
 
 
 #' Random forest filter
-#' 
-#' Fits a random forest model and ranks variables by variable importance. 
-#' 
+#'
+#' Fits a random forest model and ranks variables by variable importance.
+#'
 #' @param y Response vector
 #' @param x Matrix or dataframe of predictors
-#' @param nfilter Number of predictors to return. If `NULL` all predictors are 
+#' @param nfilter Number of predictors to return. If `NULL` all predictors are
 #' returned.
 #' @param type Type of vector returned. Default "index" returns indices,
-#' "names" returns predictor names, "full" returns a named vector of variable 
+#' "names" returns predictor names, "full" returns a named vector of variable
 #' importance.
 #' @param ntree Number of trees to grow. See [randomForest::randomForest].
-#' @param mtry Number of predictors randomly sampled as candidates at each 
+#' @param mtry Number of predictors randomly sampled as candidates at each
 #' split. See [randomForest::randomForest].
 #' @param ... Optional arguments passed to [randomForest::randomForest].
-#' @return Integer vector of indices of filtered parameters (type = "index") or 
-#' character vector of names (type = "names") of filtered parameters. If 
+#' @return Integer vector of indices of filtered parameters (type = "index") or
+#' character vector of names (type = "names") of filtered parameters. If
 #' `type` is `"full"` a named vector of variable importance is returned.
 #' @details
 #' This filter uses the `randomForest()` function from the `randomForest`
@@ -286,7 +286,7 @@ correl_filter <- function(y,
 #' [randomForest::importance] function, specifying type 1 = mean decrease in
 #' accuracy. See [randomForest::importance].
 #' @export
-#' 
+#'
 rf_filter <- function(y, x, nfilter = NULL,
                       type = c("index", "names", "full"),
                       ntree = 1000,
@@ -312,29 +312,29 @@ rf_filter <- function(y, x, nfilter = NULL,
 
 
 #' Random forest ranger filter
-#' 
+#'
 #' Fits a random forest model via the `ranger` package and ranks variables by
 #' variable importance.
-#' 
+#'
 #' @param y Response vector
 #' @param x Matrix or dataframe of predictors
-#' @param nfilter Number of predictors to return. If `NULL` all predictors are 
+#' @param nfilter Number of predictors to return. If `NULL` all predictors are
 #' returned.
 #' @param type Type of vector returned. Default "index" returns indices,
-#' "names" returns predictor names, "full" returns a named vector of variable 
+#' "names" returns predictor names, "full" returns a named vector of variable
 #' importance.
 #' @param num.trees Number of trees to grow. See [ranger::ranger].
-#' @param mtry Number of predictors randomly sampled as candidates at each 
+#' @param mtry Number of predictors randomly sampled as candidates at each
 #' split. See [ranger::ranger].
 #' @param ... Optional arguments passed to [ranger::ranger].
-#' @return Integer vector of indices of filtered parameters (type = "index") or 
-#' character vector of names (type = "names") of filtered parameters. If 
+#' @return Integer vector of indices of filtered parameters (type = "index") or
+#' character vector of names (type = "names") of filtered parameters. If
 #' `type` is `"full"` a named vector of variable importance is returned.
 #' @details
 #' This filter uses the `ranger()` function from the `ranger` package. Variable
 #' importance is calculated using mean decrease in gini impurity.
 #' @export
-#' 
+#'
 ranger_filter <- function(y, x, nfilter = NULL,
                           type = c("index", "names", "full"),
                           num.trees = 1000,
@@ -363,26 +363,26 @@ ranger_filter <- function(y, x, nfilter = NULL,
 
 
 #' ReliefF filter
-#' 
-#' Uses ReliefF algorithm from the CORElearn package to rank predictors in order 
+#'
+#' Uses ReliefF algorithm from the CORElearn package to rank predictors in order
 #' of importance.
-#' 
+#'
 #' @param y Response vector
 #' @param x Matrix or dataframe of predictors
-#' @param nfilter Number of predictors to return. If `NULL` all predictors are 
+#' @param nfilter Number of predictors to return. If `NULL` all predictors are
 #' returned.
 #' @param estimator Type of algorithm used, see [CORElearn::attrEval]
 #' @param type Type of vector returned. Default "index" returns indices,
-#' "names" returns predictor names, "full" returns a named vector of variable 
+#' "names" returns predictor names, "full" returns a named vector of variable
 #' importance.
 #' @param ... Other arguments passed to [CORElearn::attrEval]
-#' @return Integer vector of indices of filtered parameters (type = "index") or 
-#' character vector of names (type = "names") of filtered parameters. If 
+#' @return Integer vector of indices of filtered parameters (type = "index") or
+#' character vector of names (type = "names") of filtered parameters. If
 #' `type` is `"full"` a named vector of variable importance is returned.
 #' @seealso [CORElearn::attrEval()]
 #' @export
 #'
-relieff_filter <- function(y, x, nfilter = NULL, 
+relieff_filter <- function(y, x, nfilter = NULL,
                            estimator = "ReliefFequalK",
                            type = c("index", "names", "full"), ...) {
   if (!requireNamespace("CORElearn", quietly = TRUE)) {
@@ -404,25 +404,25 @@ relieff_filter <- function(y, x, nfilter = NULL,
 
 
 #' Combo filter
-#' 
-#' Filter combining univariate (t-test or anova) filtering and reliefF filtering 
+#'
+#' Filter combining univariate (t-test or anova) filtering and reliefF filtering
 #' in equal measure.
-#' 
+#'
 #' @param y Response vector
 #' @param x Matrix or dataframe of predictors
-#' @param nfilter Number of predictors to return, using 1/2 from `ttest_filter` 
-#' or `anova_filter` and 1/2 from `relieff_filter`. Since `unique` is applied, 
+#' @param nfilter Number of predictors to return, using 1/2 from `ttest_filter`
+#' or `anova_filter` and 1/2 from `relieff_filter`. Since `unique` is applied,
 #' the final number returned may be less than `nfilter`.
 #' @param type Type of vector returned. Default "index" returns indices,
 #' "names" returns predictor names, "full" returns full output.
-#' @param ... Optional arguments passed via [relieff_filter] to 
+#' @param ... Optional arguments passed via [relieff_filter] to
 #' [CORElearn::attrEval]
-#' @return Integer vector of indices of filtered parameters (type = "index") or 
-#' character vector of names (type = "names") of filtered parameters. If `type` 
-#' is `"full"` a list containing full outputs from either [ttest_filter] or 
+#' @return Integer vector of indices of filtered parameters (type = "index") or
+#' character vector of names (type = "names") of filtered parameters. If `type`
+#' is `"full"` a list containing full outputs from either [ttest_filter] or
 #' [anova_filter] and [relieff_filter] is returned.
 #' @export
-#' 
+#'
 combo_filter <- function(y, x,
                          nfilter,
                          type = c("index", "names", "full"), ...) {
@@ -470,7 +470,7 @@ combo_filter <- function(y, x,
 #' @seealso [glmnet::glmnet]
 #' @importFrom glmnet glmnet
 #' @export
-#' 
+#'
 glmnet_filter <- function(y,
                           x,
                           family = NULL,
@@ -537,7 +537,7 @@ glmnet_filter <- function(y,
 #' @return Integer vector of the indices of columns in `x` to remove due to
 #'   collinearity
 #' @export
-#' 
+#'
 collinear <- function(x, rsq_cutoff = 0.9, rsq_method = "pearson",
                       verbose = FALSE) {
   rsq <- cor(x, method = rsq_method)^2
@@ -598,37 +598,37 @@ collinear <- function(x, rsq_cutoff = 0.9, rsq_method = "pearson",
 #' @param type Type of vector returned. Default "index" returns indices, "names"
 #'   returns predictor names, "full" returns a matrix of p values.
 #' @param keep_factors Logical affecting factors with 3 or more levels.
-#'   Dataframes are coerced to a matrix using [data.matrix]. Binary
-#'   factors are converted to numeric values 0/1 and analysed as such. If
-#'   `keep_factors` is `TRUE` (the default), factors with 3 or more levels are
-#'   not filtered and are retained. If `keep_factors` is `FALSE`, they are
-#'   removed.
+#'   Dataframes are coerced to a matrix using [data.matrix]. Binary factors are
+#'   converted to numeric values 0/1 and analysed as such. If `keep_factors` is
+#'   `TRUE` (the default), factors with 3 or more levels are not filtered and
+#'   are retained. If `keep_factors` is `FALSE`, they are removed.
 #' @param method Integer determining linear model method. See
 #'   [RcppEigen::fastLmPure()]
-#' @param mc.cores Number of cores for parallelisation using
-#'   [parallel::mclapply()].
+#' @param mc.cores (Ignored for backward-compatibilty. Use [future::plan()]
+#'   instead.)
 #' @return Integer vector of indices of filtered parameters (`type = "index"`)
 #'   or character vector of names (`type = "names"`) of filtered parameters in
 #'   order of linear model AIC. Any variables in `force_vars` which are
 #'   incorporated into all models are listed first. If `type = "full"` a matrix
 #'   of AIC value, sigma (residual standard error, see [summary.lm]),
 #'   coefficient, t-statistic and p-value for each tested predictor is returned.
-#' @details
-#' This filter is based on the model `y ~ xvar + force_vars` where `y` is the
-#' response vector, `xvar` are variables in columns taken sequentially from `x`
-#' and `force_vars` are optional covariates extracted from `x`. It uses
-#' [RcppEigen::fastLmPure()] with `method = 0` as default since it is
-#' rank-revealing. `method = 3` is significantly faster but can give errors in
-#' estimation of p-value with variables of zero variance. The algorithm attempts
-#' to detect these and set their stats to `NA`. `NA` in `x` are not tolerated.
-#' 
-#' Parallelisation is available via [mclapply()]. This is provided mainly for
-#' the use case of the filter being used as standalone. Nesting parallelisation
-#' inside of parallelised [nestcv.glmnet()] or [nestcv.train()] loops is not
-#' recommended.
-#' 
-#' @export
+#' @details This filter is based on the model `y ~ xvar + force_vars` where `y`
+#'   is the response vector, `xvar` are variables in columns taken sequentially
+#'   from `x` and `force_vars` are optional covariates extracted from `x`. It
+#'   uses [RcppEigen::fastLmPure()] with `method = 0` as default since it is
+#'   rank-revealing. `method = 3` is significantly faster but can give errors in
+#'   estimation of p-value with variables of zero variance. The algorithm
+#'   attempts to detect these and set their stats to `NA`. `NA` in `x` are not
+#'   tolerated.
 #'
+#'   Parallelisation is available via [future.apply::future_lapply()]. This is
+#'   provided mainly for the use case of the filter being used as standalone.
+#'   Nesting parallelisation inside of parallelised [nestcv.glmnet()] or
+#'   [nestcv.train()] loops is not recommended (but can be done as documented in
+#'   the future package).
+#'
+#' @export
+#' @importFrom future.apply future_lapply
 lm_filter <- function(y, x,
                       force_vars = NULL,
                       nfilter = NULL,
@@ -638,7 +638,10 @@ lm_filter <- function(y, x,
                       type = c("index", "names", "full"),
                       keep_factors = TRUE,
                       method = 0L,
-                      mc.cores = 1) {
+                      mc.cores) {
+  if (!missing(mc.cores)) {
+    warning("Argument mc.cores is deprecated. Use future::plan() instead.")
+  }
   if (!requireNamespace("RcppEigen", quietly = TRUE)) {
     stop("Package 'RcppEigen' must be installed to use this filter",
          call. = FALSE)
@@ -658,13 +661,13 @@ lm_filter <- function(y, x,
     xset0 <- x[, force_vars, drop = FALSE]
     xset <- cbind(startx, xset0)
   } else xset <- startx
-  res <- mclapply(check_vars, function(i) {
+  res <- future_lapply(check_vars, function(i) {
     xset[, 2] <- x[, i]
     fit <- RcppEigen::fastLmPure(xset, y, method = method)
     if (any(is.na(fit$coefficients))) return(rep(NA, 3))  # check for rank deficient
     rss <- sum(fit$residuals^2)
     c(rss, fit$coefficients[2], fit$se[2])
-  }, mc.cores = mc.cores)
+  })
   res <- simplify2array(res)
   colnames(res) <- check_vars
   rss <- res[1,]
@@ -687,6 +690,6 @@ lm_filter <- function(y, x,
     } else return(result[-factor_ind, ])
   }
   filter_end(pval,
-             x, force_vars, nfilter, p_cutoff, rsq_cutoff, type, keep_factors, 
+             x, force_vars, nfilter, p_cutoff, rsq_cutoff, type, keep_factors,
              factor_ind)
 }

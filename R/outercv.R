@@ -48,13 +48,10 @@
 #' @param n_outer_folds Number of outer CV folds
 #' @param outer_folds Optional list containing indices of test folds for outer
 #'   CV. If supplied, `n_outer_folds` is ignored.
-#' @param cv.cores Number of cores for parallel processing of the outer loops.
-#' @param multicore_fork Logical whether to use forked multicore parallel
-#'   processing. Forked multicore processing uses `parallel::mclapply`. It is
-#'   only available on unix/mac as windows does not allow forking. It is set to
-#'   `FALSE` by default in windows and `TRUE` in unix/mac. Non-forked parallel
-#'   processing is executed using `parallel::parLapply` or `pbapply::pblapply`
-#'   if `verbose` is `TRUE`.
+#' @param cv.cores (Ignored for backward-compatibilty. Use [future::plan()]
+#'   instead.)
+#' @param multicore_fork  (Ignored for backward-compatibilty. Use
+#'   [future::plan()] instead.)
 #' @param predict_type Only used with binary classification. Calculation of ROC
 #'   AUC requires predicted class probabilities from fitted models. Most model
 #'   functions use syntax of the form `predict(..., type = "prob")`. However,
@@ -77,7 +74,7 @@
 #'   named.)
 #' @param verbose Logical whether to print messages and show progress
 #' @param suppressMsg Logical whether to suppress messages and printed output
-#'   from model functions. This is necessary when using forked multicore 
+#'   from model functions. This is necessary when using forked multicore
 #'   parallelisation.
 #' @param ... Optional arguments passed to the function specified by `model`.
 #' @return An object with S3 class "outercv"
@@ -94,23 +91,23 @@
 #'   \item{summary}{Overall performance summary. Accuracy and balanced accuracy
 #'   for classification. ROC AUC for binary classification. RMSE for
 #'   regression.}
-#' @details 
+#' @details
 #'   Some predictive model functions do not have an x & y interface. If the
 #'   function specified by `model` requires a formula, `x` & `y` will be merged
-#'   into a dataframe with `model()` called with a formula equivalent to 
+#'   into a dataframe with `model()` called with a formula equivalent to
 #'   `y ~ .`.
-#'   
+#'
 #'   The S3 formula method for `outercv` is not really recommended with large
 #'   data sets - it is envisaged to be primarily used to compare
 #'   performance of more basic models e.g. `lm()` specified by formulae for
 #'   example incorporating interactions. NOTE: filtering is not available if
 #'   `outercv` is called with a formula - use the `x-y` interface instead.
-#'   
+#'
 #'   An alternative method of tuning a single model with fixed parameters
 #'   is to use [nestcv.train] with `tuneGrid` set as a single row of a
 #'   data.frame. The parameters which are needed for a specific model can be
 #'   identified using [caret::modelLookup()].
-#'   
+#'
 #'   Case weights can be passed to model function which accept these, however
 #'   `outercv` assumes that these are passed to the model via an argument named
 #'   `weights`.
@@ -119,24 +116,23 @@
 #'   `subset`, `weights`, `offset` are passed into the model function via
 #'   `"..."` the scoping is known to go awry. Avoid using these arguments with
 #'   `model = "lm"`.
-#'   
+#'
 #'   `NA` handling differs between the default S3 method and the formula S3
 #'   method. The `na.option` argument takes a character string, while the more
 #'   typical `na.action` argument takes a function.
-#'   
+#'
 #' @importFrom caret createFolds confusionMatrix defaultSummary
 #' @importFrom data.table rbindlist
 #' @importFrom methods formalArgs
-#' @importFrom parallel mclapply
 #' @importFrom pROC roc
 #' @importFrom stats as.formula predict setNames
 #' @examples
-#' 
+#'
 #' ## Classification example
-#' 
+#'
 #' ## sigmoid function
 #' sigmoid <- function(x) {1 / (1 + exp(-x))}
-#' 
+#'
 #' # load iris dataset and simulate a binary outcome
 #' data(iris)
 #' dt <- iris[, 1:4]
@@ -145,40 +141,40 @@
 #' x <- dt
 #' y2 <- sigmoid(0.5 * dt$marker1 + 2 * dt$marker2) > runif(nrow(dt))
 #' y2 <- factor(y2)
-#' 
+#'
 #' ## Random forest
 #' library(randomForest)
 #' cvfit <- outercv(y2, x, "randomForest")
 #' summary(cvfit)
 #' plot(cvfit$roc)
-#' 
+#'
 #' ## Mixture discriminant analysis (MDA)
 #' if (requireNamespace("mda", quietly = TRUE)) {
 #'   library(mda)
 #'   cvfit <- outercv(y2, x, "mda", predict_type = "posterior")
 #'   summary(cvfit)
 #' }
-#' 
-#' 
+#'
+#'
 #' ## Example with continuous outcome
 #' y <- -3 + 0.5 * dt$marker1 + 2 * dt$marker2 + rnorm(nrow(dt), 0, 2)
 #' dt$outcome <- y
-#' 
+#'
 #' ## simple linear model - formula interface
 #' cvfit <- outercv(outcome ~ ., data = dt, model = "lm")
 #' summary(cvfit)
-#' 
+#'
 #' ## random forest for regression
 #' cvfit <- outercv(y, x, "randomForest")
 #' summary(cvfit)
-#' 
+#'
 #' ## example with lm_filter() to reduce input predictors
 #' cvfit <- outercv(y, x, "randomForest", filterFUN = lm_filter,
 #'                  filter_options = list(nfilter = 2, p_cutoff = NULL))
 #' summary(cvfit)
-#' 
+#'
 #' @export
-#' 
+#'
 outercv <- function(y, ...) {
   UseMethod("outercv")
 }
@@ -186,7 +182,7 @@ outercv <- function(y, ...) {
 
 #' @rdname outercv
 #' @export
-#' 
+#' @importFrom future.apply future_lapply
 outercv.default <- function(y, x,
                             model,
                             filterFUN = NULL,
@@ -200,8 +196,8 @@ outercv.default <- function(y, x,
                             outer_method = c("cv", "LOOCV"),
                             n_outer_folds = 10,
                             outer_folds = NULL,
-                            cv.cores = 1,
-                            multicore_fork = (Sys.info()["sysname"] != "Windows"),
+                            cv.cores,
+                            multicore_fork,
                             predict_type = "prob",
                             outer_train_predict = FALSE,
                             returnList = FALSE,
@@ -235,64 +231,21 @@ outercv.default <- function(y, x,
   }
   if (outercv.call$model == "glm") predict_type <- "response"
   if (outercv.call$model == "mda") predict_type <- "posterior"
-  
+
   verbose <- as.numeric(verbose)
-  if (verbose == 1 && (!multicore_fork || Sys.getenv("RSTUDIO") == "1")) {
-    message("Performing ", n_outer_folds, "-fold outer CV, using ",
-            plural(cv.cores, "core(s)"))}
-  
+  if (verbose == 1) {
+    message("Performing ", n_outer_folds, "-fold outer CV")
+  }
+
   dots <- list(...)
-  if (!multicore_fork && cv.cores >= 2) {
-    cl <- makeCluster(cv.cores)
-    varlist <- c("outer_folds", "y", "x", "model", "reg","filterFUN", 
-                 "filter_options", "weights", "balance", "balance_options",
-                 "modifyX", "modifyX_useY", "modifyX_options",
-                 "predict_type", "outer_train_predict", "outercvCore", 
-                 "suppressMsg", "dots")
-    clusterExport(cl, varlist = varlist, envir = environment())
-    on.exit(stopCluster(cl))
-    if (verbose) {
-      # pblapply
-      if (!requireNamespace("pbapply", quietly = TRUE)) {
-        stop("Package 'pbapply' must be installed", call. = FALSE)}
-      outer_res <- pbapply::pblapply(seq_along(outer_folds), function(i) {
-        args <- c(list(i=i, y=y, x=x, outer_folds=outer_folds, model=model, reg=reg,
-                       filterFUN=filterFUN, filter_options=filter_options,
-                       weights=weights, balance=balance,
-                       balance_options=balance_options,
-                       modifyX=modifyX, modifyX_useY=modifyX_useY,
-                       modifyX_options=modifyX_options,
-                       predict_type=predict_type,
-                       outer_train_predict=outer_train_predict,
-                       suppressMsg=suppressMsg), dots)
-        do.call(outercvCore, args)
-      }, cl = cl)
-    } else {
-      # parLapply
-      outer_res <- parLapply(cl = cl, seq_along(outer_folds), function(i) {
-        args <- c(list(i=i, y=y, x=x, outer_folds=outer_folds, model=model, reg=reg,
-                       filterFUN=filterFUN, filter_options=filter_options,
-                       weights=weights, balance=balance,
-                       balance_options=balance_options,
-                       modifyX=modifyX, modifyX_useY=modifyX_useY,
-                       modifyX_options=modifyX_options,
-                       predict_type=predict_type,
-                       outer_train_predict=outer_train_predict,
-                       suppressMsg=suppressMsg), dots)
-        do.call(outercvCore, args)
-      })
-    }
-  } else {
-    # linux/mac, forked
-    outer_res <- mclapply(seq_along(outer_folds), function(i) {
+  outer_res <- future_lapply(seq_along(outer_folds), function(i) {
       outercvCore(i, y, x, outer_folds, model, reg,
                   filterFUN, filter_options, weights,
                   balance, balance_options,
                   modifyX, modifyX_useY, modifyX_options,
                   predict_type,
                   outer_train_predict, verbose, suppressMsg, ...)
-    }, mc.cores = cv.cores)
-  }
+  }, future.seed = TRUE)
   if (returnList) return(outer_res)
   predslist <- lapply(outer_res, '[[', 'preds')
   output <- data.table::rbindlist(predslist)
@@ -308,7 +261,7 @@ outercv.default <- function(y, x,
     fit.roc <- pROC::roc(output$testy, output$predyp, direction = "<",
                          quiet = TRUE)
   }
-  
+
   # fit final model
   if (final) {
     if (verbose == 1) message("Fitting final model on whole data")
@@ -317,7 +270,7 @@ outercv.default <- function(y, x,
                          modifyX, modifyX_useY, modifyX_options)
     yfinal <- dat$ytrain
     filtx <- dat$filt_xtrain
-    
+
     if ("formula" %in% formalArgs(model)) {
       dat <- if (is.data.frame(filtx)) {filtx
       } else as.data.frame(filtx, stringsAsFactors = TRUE)
@@ -339,7 +292,7 @@ outercv.default <- function(y, x,
       printlog <- capture.output({ fit <- do.call(model, args) })
     } else fit <- do.call(model, args)
   } else yfinal <- fit <- filtx <- NULL
-  
+
   end <- Sys.time()
   if (verbose == 1) message("Duration: ", format(end - start))
   out <- list(call = outercv.call,
@@ -381,7 +334,7 @@ outercvCore <- function(i, y, x, outer_folds, model, reg,
   filt_xtrain <- dat$filt_xtrain
   filt_xtest <- dat$filt_xtest
   dots <- list(...)
-  
+
   # check if model uses formula
   if ("formula" %in% formalArgs(model)) {
     dat <- if (is.data.frame(filt_xtrain)) {filt_xtrain
@@ -400,13 +353,13 @@ outercvCore <- function(i, y, x, outer_folds, model, reg,
       args <- c(alist(y = ytrain, x = filt_xtrain, weights = weights[-test]),
                 dots)
     }
-    
+
   }
-  
+
   if (suppressMsg) {
     printlog <- capture.output({ fit <- do.call(model, args) })
   } else fit <- do.call(model, args)
-  
+
   # test on outer CV
   predy <- predict(fit, newdata = filt_xtest)
   preds <- data.frame(predy=predy, testy=ytest)
@@ -428,12 +381,12 @@ outercvCore <- function(i, y, x, outer_folds, model, reg,
       train_preds <- cbind(train_preds, predyp)
     }
   } else train_preds <- NULL
-  
+
   if (verbose == 1) {
     end <- Sys.time()
     message_parallel("Fitted fold ", i, " (", format(end - start, digits = 3), ")")
   } else if (verbose == 2) cat_parallel("=")
-  
+
   list(preds = preds,
        train_preds = train_preds,
        fit = fit,
@@ -445,14 +398,12 @@ outercvCore <- function(i, y, x, outer_folds, model, reg,
 #' @rdname outercv
 #' @importFrom stats na.fail model.frame model.response reformulate terms
 #' @export
-#' 
+#'
 outercv.formula <- function(formula, data,
                             model,
                             outer_method = c("cv", "LOOCV"),
                             n_outer_folds = 10,
                             outer_folds = NULL,
-                            cv.cores = 1,
-                            multicore_fork = (Sys.info()["sysname"] != "Windows"),
                             predict_type = "prob",
                             outer_train_predict = FALSE,
                             verbose = FALSE,
@@ -480,16 +431,16 @@ outercv.formula <- function(formula, data,
     attr(y, "na.action") <- attr(m, "na.action")
     m <- model.frame(terms(reformulate(attributes(Terms)$term.labels)),
                      data.frame(m))
-    out <- outercv.default(y, m, outer_method = outer_method, 
-                           n_outer_folds = n_outer_folds, cv.cores = cv.cores, ...)
+    out <- outercv.default(y, m, outer_method = outer_method,
+                           n_outer_folds = n_outer_folds, ...)
     return(out)
   }
   # for models designed for formula method
   verbose <- as.numeric(verbose)
-  if (verbose == 1 && (!multicore_fork || Sys.getenv("RSTUDIO") == "1")) {
-    message("Performing ", n_outer_folds, "-fold outer CV, using ",
-            plural(cv.cores, "core(s)"))}
-  
+  if (verbose == 1) {
+    message("Performing ", n_outer_folds, "-fold outer CV")
+  }
+
   outer_method <- match.arg(outer_method)
   y <- data[, all.vars(formula[[2]])]
   reg <- !(is.factor(y) | is.character(y))  # y = regression
@@ -499,31 +450,14 @@ outercv.formula <- function(formula, data,
                           LOOCV = 1:length(y))
   }
   if (outercv.call$model == "glm") predict_type <- "response"
-  
+
   dots <- list(...)
-  if (Sys.info()["sysname"] == "Windows" & cv.cores >= 2) {
-    cl <- makeCluster(cv.cores)
-    clusterExport(cl, varlist = c("outer_folds", "formula", "data", "y", 
-                                  "model", "reg", "predict_type",
-                                  "outer_train_predict", "outercvFormulaCore",
-                                  "suppressMsg", "dots"),
-                  envir = environment())
-    on.exit(stopCluster(cl))
-    outer_res <- parLapply(cl = cl, seq_along(outer_folds), function(i) {
-      args <- c(list(i=i, outer_folds=outer_folds, formula=formula, data=data, 
-                     y=y, model=model, reg=reg, predict_type=predict_type,
-                     suppressMsg=suppressMsg), 
-                dots)
-      do.call(outercvFormulaCore, args)
-    })
-  } else {
-    outer_res <- mclapply(seq_along(outer_folds), function(i) {
+  outer_res <- future_lapply(seq_along(outer_folds), function(i) {
       outercvFormulaCore(i, outer_folds, formula, data, y, model,
                          reg, predict_type, outer_train_predict, verbose,
                          suppressMsg, ...)
-    }, mc.cores = cv.cores)
-  }
-  
+  }, future.seed = TRUE)
+
   predslist <- lapply(outer_res, '[[', 'preds')
   output <- data.table::rbindlist(predslist)
   output <- as.data.frame(output)
@@ -537,17 +471,17 @@ outercv.formula <- function(formula, data,
     fit.roc <- pROC::roc(output$testy, output$predyp, direction = "<",
                          quiet = TRUE)
   }
-  
+
   # fit final model
   if (verbose == 1) message("Fitting final model on whole data")
   args <- c(list(formula = formula, data = quote(data)), dots)
   if (suppressMsg) {
     printlog <- capture.output({ fit <- do.call(model, args) })
   } else fit <- do.call(model, args)
-  
+
   end <- Sys.time()
   if (verbose == 1) message("Duration: ", format(end - start))
-  
+
   out <- list(call = outercv.call,
               output = output,
               outer_result = outer_res,
@@ -562,7 +496,7 @@ outercv.formula <- function(formula, data,
   out
 }
 
-  
+
 outercvFormulaCore <- function(i, outer_folds, formula, data, y, model,
                                reg, predict_type, outer_train_predict,
                                verbose = FALSE, suppressMsg = FALSE, ...) {
@@ -573,7 +507,7 @@ outercvFormulaCore <- function(i, outer_folds, formula, data, y, model,
   if (suppressMsg) {
     printlog <- capture.output({ fit <- do.call(model, args) })
   } else fit <- do.call(model, args)
-  
+
   # test on outer CV
   predy <- predict(fit, newdata = data[test, ])
   preds <- data.frame(predy=predy, testy=y[test])
@@ -595,12 +529,12 @@ outercvFormulaCore <- function(i, outer_folds, formula, data, y, model,
     }
     rownames(train_preds) <- rownames(data)[-test]
   } else train_preds <- NULL
-  
+
   if (verbose == 1) {
     end <- Sys.time()
     message_parallel("Fitted fold ", i, " (", format(end - start, digits = 3), ")")
   } else if (verbose == 2) cat_parallel("=")
-  
+
   list(preds = preds,
        train_preds = train_preds,
        fit = fit)
@@ -608,8 +542,8 @@ outercvFormulaCore <- function(i, outer_folds, formula, data, y, model,
 
 
 #' @export
-summary.outercv <- function(object, 
-                                 digits = max(3L, getOption("digits") - 3L), 
+summary.outercv <- function(object,
+                                 digits = max(3L, getOption("digits") - 3L),
                                  ...) {
   cat("Single cross-validation to measure performance\n")
   cat("Outer loop: ", switch(object$outer_method,
@@ -625,7 +559,7 @@ summary.outercv <- function(object,
   cat(object$dimx[1], "observations,", object$dimx[2], "predictors\n")
   if (!is.numeric(object$y)) print(c(table(object$y)))
   cat("\n")
-  
+
   cat("Model: ", object$call$model, "\n")
   if (!is.null(object$call$filterFUN)) {
     cat("Filter: ", object$call$filterFUN, "\n")
@@ -650,7 +584,7 @@ summary.outercv <- function(object,
 
 
 #' @importFrom utils methods
-#' 
+#'
 hasMethod2 <- function(object, func) {
   func %in% unlist(lapply(class(object), function(x) {
         attr(methods(class = x), "info")$generic}))

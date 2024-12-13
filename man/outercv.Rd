@@ -23,8 +23,8 @@ outercv(y, ...)
   outer_method = c("cv", "LOOCV"),
   n_outer_folds = 10,
   outer_folds = NULL,
-  cv.cores = 1,
-  multicore_fork = (Sys.info()["sysname"] != "Windows"),
+  cv.cores,
+  multicore_fork,
   predict_type = "prob",
   outer_train_predict = FALSE,
   returnList = FALSE,
@@ -42,8 +42,6 @@ outercv(y, ...)
   outer_method = c("cv", "LOOCV"),
   n_outer_folds = 10,
   outer_folds = NULL,
-  cv.cores = 1,
-  multicore_fork = (Sys.info()["sysname"] != "Windows"),
   predict_type = "prob",
   outer_train_predict = FALSE,
   verbose = FALSE,
@@ -106,14 +104,11 @@ to do k-fold CV or leave one out CV (LOOCV) for the outer folds}
 \item{outer_folds}{Optional list containing indices of test folds for outer
 CV. If supplied, \code{n_outer_folds} is ignored.}
 
-\item{cv.cores}{Number of cores for parallel processing of the outer loops.}
+\item{cv.cores}{(Ignored for backward-compatibilty. Use \code{\link[future:plan]{future::plan()}}
+instead.)}
 
-\item{multicore_fork}{Logical whether to use forked multicore parallel
-processing. Forked multicore processing uses \code{parallel::mclapply}. It is
-only available on unix/mac as windows does not allow forking. It is set to
-\code{FALSE} by default in windows and \code{TRUE} in unix/mac. Non-forked parallel
-processing is executed using \code{parallel::parLapply} or \code{pbapply::pblapply}
-if \code{verbose} is \code{TRUE}.}
+\item{multicore_fork}{(Ignored for backward-compatibilty. Use
+\code{\link[future:plan]{future::plan()}} instead.)}
 
 \item{predict_type}{Only used with binary classification. Calculation of ROC
 AUC requires predicted class probabilities from fitted models. Most model

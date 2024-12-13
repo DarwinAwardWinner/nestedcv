@@ -18,7 +18,7 @@ nestcv.SuperLearner(
   outer_method = c("cv", "LOOCV"),
   n_outer_folds = 10,
   outer_folds = NULL,
-  cv.cores = 1,
+  cv.cores,
   final = TRUE,
   na.option = "pass",
   verbose = TRUE,
@@ -76,9 +76,8 @@ to do k-fold CV or leave one out CV (LOOCV) for the outer folds}
 \item{outer_folds}{Optional list containing indices of test folds for outer
 CV. If supplied, \code{n_outer_folds} is ignored.}
 
-\item{cv.cores}{Number of cores for parallel processing of the outer loops.
-NOTE: this uses \code{parallel::mclapply} on unix/mac and \code{parallel::parLapply}
-on windows.}
+\item{cv.cores}{(Ignored for backward-compatibilty. Use \code{\link[future:plan]{future::plan()}}
+instead.)}
 
 \item{final}{Logical whether to fit final model.}
 

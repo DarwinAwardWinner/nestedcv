@@ -12,7 +12,7 @@
 #' together and error estimation/ accuracy determined. The default is 10x10
 #' nested CV.
 #'
-#' @param y Response vector or matrix. Matrix is only used for 
+#' @param y Response vector or matrix. Matrix is only used for
 #' `family = 'mgaussian'` or `'cox'`.
 #' @param x Matrix of predictors. Dataframes will be coerced to a matrix as
 #'   is necessary for glmnet.
@@ -70,9 +70,6 @@
 #'   variables. See [glmnet::glmnet]. Note this works separately from filtering.
 #'   For some `nestedcv` filter functions you might need to set `force_vars` to
 #'   avoid filtering out features.
-#' @param cv.cores Number of cores for parallel processing of the outer loops.
-#'   NOTE: this uses `parallel::mclapply` on unix/mac and `parallel::parLapply`
-#'   on windows.
 #' @param finalCV Logical whether to perform one last round of CV on the whole
 #'   dataset to determine the final model parameters. If set to `FALSE`, the
 #'   median of hyperparameters from outer CV folds are used for the final model.
@@ -119,7 +116,6 @@
 #' @importFrom caret createFolds confusionMatrix defaultSummary
 #' @importFrom data.table rbindlist
 #' @importFrom glmnet cv.glmnet glmnet
-#' @importFrom parallel mclapply makeCluster clusterExport stopCluster parLapply
 #' @importFrom pROC roc
 #' @importFrom stats predict setNames
 #' @examples
@@ -127,40 +123,39 @@
 #' ## Example binary classification problem with P >> n
 #' x <- matrix(rnorm(150 * 2e+04), 150, 2e+04)  # predictors
 #' y <- factor(rbinom(150, 1, 0.5))  # binary response
-#' 
+#'
 #' ## Partition data into 2/3 training set, 1/3 test set
 #' trainSet <- caret::createDataPartition(y, p = 0.66, list = FALSE)
-#' 
+#'
 #' ## t-test filter using whole dataset
 #' filt <- ttest_filter(y, x, nfilter = 100)
 #' filx <- x[, filt]
-#' 
+#'
 #' ## Train glmnet on training set only using filtered predictor matrix
 #' library(glmnet)
 #' fit <- cv.glmnet(filx[trainSet, ], y[trainSet], family = "binomial")
 #' plot(fit)
-#' 
+#'
 #' ## Predict response on test partition
 #' predy <- predict(fit, newx = filx[-trainSet, ], s = "lambda.min", type = "class")
 #' predy <- as.vector(predy)
 #' predyp <- predict(fit, newx = filx[-trainSet, ], s = "lambda.min", type = "response")
 #' predyp <- as.vector(predyp)
 #' output <- data.frame(testy = y[-trainSet], predy = predy, predyp = predyp)
-#' 
+#'
 #' ## Results on test partition
 #' ## shows bias since univariate filtering was applied to whole dataset
 #' predSummary(output)
-#' 
+#'
 #' ## Nested CV
 #' ## n_outer_folds reduced to speed up example
 #' fit2 <- nestcv.glmnet(y, x, family = "binomial", alphaSet = 1,
 #'                       n_outer_folds = 3,
 #'                       filterFUN = ttest_filter,
-#'                       filter_options = list(nfilter = 100),
-#'                       cv.cores = 2)
+#'                       filter_options = list(nfilter = 100))
 #' summary(fit2)
 #' plot_lambdas(fit2, showLegend = "bottomright")
-#' 
+#'
 #' ## ROC plots
 #' library(pROC)
 #' testroc <- roc(output$testy, output$predyp, direction = "<")
@@ -168,14 +163,14 @@
 #' plot(fit2$roc)
 #' lines(inroc, col = 'blue')
 #' lines(testroc, col = 'red')
-#' legend('bottomright', legend = c("Nested CV", "Left-out inner CV folds", 
-#'                                  "Test partition, non-nested filtering"), 
+#' legend('bottomright', legend = c("Nested CV", "Left-out inner CV folds",
+#'                                  "Test partition, non-nested filtering"),
 #'        col = c("black", "blue", "red"), lty = 1, lwd = 2, bty = "n")
 #' }
 #' @export
-#' 
+#' @importFrom future.apply future_lapply
 nestcv.glmnet <- function(y, x,
-                          family = c("gaussian", "binomial", "poisson", 
+                          family = c("gaussian", "binomial", "poisson",
                                      "multinomial", "cox", "mgaussian"),
                           filterFUN = NULL,
                           filter_options = NULL,
@@ -195,7 +190,6 @@ nestcv.glmnet <- function(y, x,
                           outer_train_predict = FALSE,
                           weights = NULL,
                           penalty.factor = rep(1, ncol(x)),
-                          cv.cores = 1,
                           finalCV = TRUE,
                           na.option = "omit",
                           verbose = FALSE,
@@ -218,7 +212,7 @@ nestcv.glmnet <- function(y, x,
     stop("`balance` and `weights` cannot be used at the same time")}
   if (!is.null(balance) && is.numeric(y)) {
     stop("`balance` can only be used for classification")}
-  
+
   if (is.null(outer_folds)) {
     y1 <- if (is.matrix(y)) y[,1] else y
     outer_folds <- switch(outer_method,
@@ -231,74 +225,31 @@ nestcv.glmnet <- function(y, x,
     }
     n_outer_folds <- length(outer_folds)
   }
-  
+
   verbose <- as.numeric(verbose)
-  if (verbose == 1) message("Performing ", n_outer_folds, "-fold outer CV, using ",
-                       plural(cv.cores, "core(s)"))
-  if (Sys.info()["sysname"] == "Windows" & cv.cores >= 2) {
-    cl <- makeCluster(cv.cores)
-    dots <- list(...)
-    varlist = c("outer_folds", "y", "x", "filterFUN", "filter_options",
-                "alphaSet", "min_1se",  "n_inner_folds", "keep", "family",
-                "weights", "balance", "balance_options", "penalty.factor",
-                "modifyX", "modifyX_useY", "modifyX_options",
-                "outer_train_predict", "nestcv.glmnetCore", "dots")
-    clusterExport(cl, varlist = varlist, envir = environment())
-    on.exit(stopCluster(cl))
-    if (verbose == 1) {
-      if (!requireNamespace("pbapply", quietly = TRUE)) {
-        stop("Package 'pbapply' must be installed", call. = FALSE)}
-      outer_res <- pbapply::pblapply(seq_along(outer_folds), function(i) {
-        args <- c(list(i=i, y=y, x=x, outer_folds=outer_folds,
-                       filterFUN=filterFUN, filter_options=filter_options,
-                       balance=balance, balance_options=balance_options,
-                       modifyX=modifyX, modifyX_useY=modifyX_useY,
-                       modifyX_options=modifyX_options,
-                       alphaSet=alphaSet, min_1se=min_1se,
-                       n_inner_folds=n_inner_folds, keep=keep, family=family,
-                       weights=weights, penalty.factor=penalty.factor,
-                       outer_train_predict=outer_train_predict), dots)
-        do.call(nestcv.glmnetCore, args)
-      }, cl = cl)
-    } else {
-      outer_res <- parLapply(cl = cl, seq_along(outer_folds), function(i) {
-        args <- c(list(i=i, y=y, x=x, outer_folds=outer_folds,
-                       filterFUN=filterFUN, filter_options=filter_options,
-                       balance=balance, balance_options=balance_options,
-                       modifyX=modifyX, modifyX_useY=modifyX_useY,
-                       modifyX_options=modifyX_options,
-                       alphaSet=alphaSet, min_1se=min_1se,
-                       n_inner_folds=n_inner_folds, keep=keep, family=family,
-                       weights=weights, penalty.factor=penalty.factor,
-                       outer_train_predict=outer_train_predict), dots)
-        do.call(nestcv.glmnetCore, args)
-      })
-    }
-  } else {
-    # linux/mac
-    outer_res <- mclapply(seq_along(outer_folds), function(i) {
+  if (verbose == 1) message("Performing ", n_outer_folds, "-fold outer CV")
+  outer_res <- future_lapply(seq_along(outer_folds), function(i) {
       nestcv.glmnetCore(i, y, x, outer_folds, filterFUN, filter_options,
                         balance, balance_options,
                         modifyX, modifyX_useY, modifyX_options,
                         alphaSet, min_1se, n_inner_folds, keep, family,
                         weights, penalty.factor, outer_train_predict,
                         verbose, ...)
-    }, mc.cores = cv.cores)
-  }
-  
+  }, future.seed = TRUE)
+
   predslist <- lapply(outer_res, '[[', 'preds')
   output <- data.table::rbindlist(predslist)
   output <- as.data.frame(output)
   if (!is.null(rownames(x))) {
     rownames(output) <- unlist(lapply(predslist, rownames))}
-  
+
   summary <- predSummary(output, family = family)
   glmnet.roc <- NULL
   if (family == "binomial") {
-    glmnet.roc <- pROC::roc(output$testy, output$predyp, direction = "<", 
+    glmnet.roc <- pROC::roc(output$testy, output$predyp, direction = "<",
                            quiet = TRUE)
   }
-  
+
   if (is.na(finalCV)) {
     fit <- final_coef <- final_param <- yfinal <- final_vars <- xsub <- filtx <- NA
   } else {
@@ -309,7 +260,7 @@ nestcv.glmnet <- function(y, x,
     yfinal <- dat$ytrain
     filtx <- as.matrix(dat$filt_xtrain)
     filtpen.factor <- dat$filt_pen.factor
-    
+
     if (finalCV) {
       # use CV on whole data to finalise parameters
       if (verbose == 1)
@@ -324,7 +275,7 @@ nestcv.glmnet <- function(y, x,
         } else message("Cannot pass `outer_folds` to final CV")
       }
       cvafit <- cva.glmnet(filtx, yfinal, alphaSet = alphaSet, family = family,
-                           weights = weights, penalty.factor = filtpen.factor, 
+                           weights = weights, penalty.factor = filtpen.factor,
                            nfolds = n_inner_folds, foldid = foldid, ...)
       alphafit <- cvafit$fits[[cvafit$which_alpha]]
       s <- exp((log(alphafit$lambda.min) * (1-min_1se) + log(alphafit$lambda.1se) * min_1se))
@@ -336,10 +287,10 @@ nestcv.glmnet <- function(y, x,
       lam <- exp(median(log(unlist(lapply(outer_res, '[[', 'lambda')))))
       alph <- median(unlist(lapply(outer_res, '[[', 'alpha')))
       final_param <- setNames(c(lam, alph), c("lambda", "alpha"))
-      fit <- glmnet(filtx, yfinal, alpha = alph, family = family, 
+      fit <- glmnet(filtx, yfinal, alpha = alph, family = family,
                     weights = weights, penalty.factor = filtpen.factor, ...)
     }
-    
+
     fin_coef <- glmnet_coefs(fit, s = final_param["lambda"])
     if (is.list(fin_coef) | length(fin_coef) == 1) {
       final_coef <- fin_coef  # multinomial
@@ -363,10 +314,10 @@ nestcv.glmnet <- function(y, x,
     all_vars <- all_vars[all_vars %in% colnames(x)]
     xsub <- x[, all_vars]
   }
-  
+
   end <- Sys.time()
   if (verbose == 1) message("Duration: ", format(end - start))
-  
+
   out <- list(call = nestcv.call,
               output = output,
               outer_result = outer_res,
@@ -409,8 +360,8 @@ nestcv.glmnetCore <- function(i, y, x, outer_folds, filterFUN, filter_options,
   filt_xtrain <- as.matrix(dat$filt_xtrain)
   filt_xtest <- as.matrix(dat$filt_xtest)
   filt_pen.factor <- dat$filt_pen.factor
-  
-  cvafit <- cva.glmnet(x = filt_xtrain, y = ytrain, 
+
+  cvafit <- cva.glmnet(x = filt_xtrain, y = ytrain,
                        alphaSet = alphaSet, nfolds = n_inner_folds,
                        keep = keep, family = family, weights = weights[-test],
                        penalty.factor = filt_pen.factor, ...)

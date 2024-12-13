@@ -41,9 +41,8 @@
 #' @param n_outer_folds Number of outer CV folds
 #' @param outer_folds Optional list containing indices of test folds for outer
 #'   CV. If supplied, `n_outer_folds` is ignored.
-#' @param cv.cores Number of cores for parallel processing of the outer loops.
-#'   NOTE: this uses `parallel::mclapply` on unix/mac and `parallel::parLapply`
-#'   on windows.
+#' @param cv.cores (Ignored for backward-compatibilty. Use [future::plan()]
+#'   instead.)
 #' @param final Logical whether to fit final model.
 #' @param na.option Character value specifying how `NA`s are dealt with.
 #'   `"omit"` is equivalent to `na.action = na.omit`. `"omitcol"` removes cases
@@ -58,16 +57,16 @@
 #' of predictors. SuperLearner prefers dataframes as inputs for the predictors.
 #' If `x` is a matrix it will be coerced to a dataframe and variable names
 #' adjusted by [make.names()].
-#' 
+#'
 #' Parallelisation of the outer CV folds is available on linux/mac, but not
 #' available on windows. On windows, `snowSuperLearner()` is called instead, so
 #' that parallelisation is performed across each call to SuperLearner.
-#' 
+#'
 #' @note
 #' Care should be taken with some `SuperLearner` models e.g. `SL.gbm` as some
 #' models have multicore enabled by default, which can lead to huge numbers of
 #' processes being spawned.
-#' 
+#'
 #' @return An object with S3 class "nestcv.SuperLearner"
 #'   \item{call}{the matched call}
 #'   \item{output}{Predictions on the left-out outer folds}
@@ -85,9 +84,9 @@
 #'   \item{summary}{Overall performance summary. Accuracy and balanced accuracy
 #'   for classification. ROC AUC for binary classification. RMSE for
 #'   regression.}
-#' 
+#'
 #' @seealso [SuperLearner::SuperLearner()]
-#' @importFrom parallel clusterEvalQ
+#' @importFrom future.apply future_lapply
 #' @export
 
 nestcv.SuperLearner <- function(y, x,
@@ -102,11 +101,14 @@ nestcv.SuperLearner <- function(y, x,
                                 outer_method = c("cv", "LOOCV"),
                                 n_outer_folds = 10,
                                 outer_folds = NULL,
-                                cv.cores = 1,
+                                cv.cores,
                                 final = TRUE,
                                 na.option = "pass",
                                 verbose = TRUE,
                                 ...) {
+  if (!missing(cv.cores)) {
+    warning("Argument cv.cores is deprecated. Use future::plan() instead.")
+  }
   if (!requireNamespace("SuperLearner", quietly = TRUE)) {
     stop("Package 'SuperLearner' must be installed", call. = FALSE)
   }
@@ -124,56 +126,37 @@ nestcv.SuperLearner <- function(y, x,
   reg <- !is.factor(y)  # y = regression
   if (!is.null(balance) & reg) {
     stop("`balance` can only be used for classification")}
-  
+
   outer_method <- match.arg(outer_method)
   if (is.null(outer_folds)) {
     outer_folds <- switch(outer_method,
                           cv = createFolds(y, k = n_outer_folds),
                           LOOCV = 1:length(y))
   }
-  
+
   verbose <- as.numeric(verbose)
-  if (Sys.info()["sysname"] == "Windows" & cv.cores >= 2) {
     if (verbose == 1 && Sys.getenv("RSTUDIO") == "1") {
-      message("Performing ", n_outer_folds, "-fold outer CV (using snow)")}
-    dots <- list(...)
-    cl <- parallel::makeCluster(cv.cores)
-    on.exit(stopCluster(cl))
-    foo <- parallel::clusterEvalQ(cl, library(SuperLearner))
-    outer_res <- lapply(seq_along(outer_folds), function(i) {
-      args <- c(list(cl=cl, i=i, y=y, x=x, outer_folds=outer_folds,
-                     filterFUN=filterFUN, filter_options=filter_options,
-                     weights=weights, balance=balance,
-                     balance_options=balance_options,
-                     modifyX=modifyX, modifyX_useY=modifyX_useY,
-                     modifyX_options=modifyX_options, verbose=verbose), dots)
-      do.call(cl_nestSLcore, args)
-    })
-    
-  } else {
-    if (verbose == 1 && Sys.getenv("RSTUDIO") == "1") {
-      message("Performing ", n_outer_folds, "-fold outer CV, using ",
-              plural(cv.cores, "core(s)"))}
-    outer_res <- mclapply(seq_along(outer_folds), function(i) {
+      message("Performing ", n_outer_folds, "-fold outer CV")
+    }
+    outer_res <- future_lapply(seq_along(outer_folds), function(i) {
       nestSLcore(i, y, x, outer_folds,
                  filterFUN, filter_options, weights,
                  balance, balance_options,
                  modifyX, modifyX_useY, modifyX_options, verbose, ...)
-    }, mc.cores = cv.cores)
-  }
-  
+    }, future.seed = TRUE)
+
   predslist <- lapply(outer_res, '[[', 'preds')
   output <- data.table::rbindlist(predslist)
   output <- as.data.frame(output)
   if (!is.null(rownames(x))) {
     rownames(output) <- unlist(lapply(predslist, rownames))}
-  
+
   summary <- predSummary(output)
   if (!reg & nlevels(y) == 2) {
     fit.roc <- pROC::roc(output$testy, output$predyp, direction = "<",
                          quiet = TRUE)
   } else fit.roc <- NULL
-  
+
   if (!final | is.na(final)) {
     fit <- yfinal <- final_vars <- filtx <- NA
   } else {
@@ -189,10 +172,10 @@ nestcv.SuperLearner <- function(y, x,
     fit <- SuperLearner::SuperLearner(Y = Y, X = X, obsWeights = weights, ...)
     final_vars <- colnames(filtx)
   }
-  
+
   end <- Sys.time()
   if (verbose == 1) message("Duration: ", format(end - start))
-  
+
   out <- list(call = ncv.call,
               output = output,
               outer_result = outer_res,
@@ -229,12 +212,12 @@ nestSLcore <- function(i, y, x, outer_folds,
   ytest <- dat$ytest
   filt_xtrain <- data.frame(dat$filt_xtrain)
   filt_xtest <- data.frame(dat$filt_xtest)
-  
+
   reg <- !is.factor(y)
   Y <- if (reg) ytrain else as.numeric(ytrain) -1
   fit <- SuperLearner::SuperLearner(Y = Y, X = filt_xtrain,
                                     obsWeights = weights[-test], ...)
-  
+
   # test on outer CV
   predSL <- predict(fit, newdata = filt_xtest,
                     X = filt_xtrain, Y = Y, onlySL = TRUE)
@@ -244,7 +227,7 @@ nestSLcore <- function(i, y, x, outer_folds,
     # convert prob to class
     predy <- levels(y)[as.numeric(predSL$pred > 0.5) +1]
   }
-  
+
   preds <- data.frame(predy=predy, testy=ytest)
   # for AUC
   if (!reg & nlevels(y) == 2) {
@@ -278,12 +261,12 @@ cl_nestSLcore <- function(cl, i, y, x, outer_folds,
   ytest <- dat$ytest
   filt_xtrain <- data.frame(dat$filt_xtrain)
   filt_xtest <- data.frame(dat$filt_xtest)
-  
+
   reg <- !is.factor(y)
   Y <- if (reg) ytrain else as.numeric(ytrain) -1
   fit <- SuperLearner::snowSuperLearner(cl = cl, Y = Y, X = filt_xtrain,
                                     obsWeights = weights[-test], ...)
-  
+
   # test on outer CV
   predSL <- predict(fit, newdata = filt_xtest,
                     X = filt_xtrain, Y = Y, onlySL = TRUE)
@@ -293,19 +276,19 @@ cl_nestSLcore <- function(cl, i, y, x, outer_folds,
     # convert prob to class
     predy <- levels(y)[as.numeric(predSL$pred > 0.5) +1]
   }
-  
+
   preds <- data.frame(predy=predy, testy=ytest)
   # for AUC
   if (!reg & nlevels(y) == 2) {
     preds$predyp <- c(predSL$pred)
   }
   rownames(preds) <- rownames(filt_xtest)
-  
+
   end <- Sys.time()
   if (verbose == 1) {
     message("Fold ", i, " done (", format(end - start, digits = 3), ")")
   } else if (verbose == 2) cat_parallel("=")
-  
+
   list(preds = preds,
        fit = fit,
        nfilter = ncol(filt_xtest),
@@ -315,8 +298,8 @@ cl_nestSLcore <- function(cl, i, y, x, outer_folds,
 
 #' @importFrom matrixStats rowSds
 #' @export
-summary.nestcv.SuperLearner <- function(object, 
-                                   digits = max(3L, getOption("digits") - 3L), 
+summary.nestcv.SuperLearner <- function(object,
+                                   digits = max(3L, getOption("digits") - 3L),
                                    ...) {
   cat("Nested cross-validation with SuperLearner\n")
   cat("Outer loop: ", switch(object$outer_method,
@@ -333,12 +316,12 @@ summary.nestcv.SuperLearner <- function(object,
   cat(object$dimx[1], "observations,", object$dimx[2], "predictors\n")
   if (!is.numeric(object$y)) print(c(table(object$y)))
   cat("\nModel: SuperLearner\n")
-  
+
   SLcoef <- lapply(object$outer_result, function(x) x$fit$coef)
   SLcoef <- do.call(cbind, SLcoef)
   SLrisk <- lapply(object$outer_result, function(x) x$fit$cvRisk)
   SLrisk <- do.call(cbind, SLrisk)
-  
+
   if (!is.null(object$call$filterFUN)) {
     cat("Filter: ", object$call$filterFUN, "\n")
     nfilter <- unlist(lapply(object$outer_result, '[[', 'nfilter'))
@@ -349,14 +332,14 @@ summary.nestcv.SuperLearner <- function(object,
     nfilter <- NULL
     cat("No filter\n")
   }
-  
+
   res <- data.frame(Risk = rowMeans(SLrisk, na.rm = TRUE),
                     `Risk SE` = rowSds(SLrisk, na.rm = TRUE)/sqrt(ncol(SLrisk)),
                     Coef = rowMeans(SLcoef, na.rm = TRUE),
                     `Coef SE` = rowSds(SLcoef, na.rm = TRUE)/sqrt(ncol(SLcoef)),
                     check.names = FALSE)
   print(res, digits = digits, print.gap = 2L)
-  
+
   cat("\nFinal fit:")
   print(object$final_fit)
   cat("\nResult:\n")
@@ -375,7 +358,7 @@ predict.nestcv.SuperLearner <- function(object, newdata,
     if (is.null(object$modify_fit)) stop("`modify_fit` is missing")
     newdata <- predict(object$modify_fit, newdata)
   }
-  if (any(!object$final_vars %in% colnames(newdata))) 
+  if (any(!object$final_vars %in% colnames(newdata)))
     stop("newdata is missing some predictors", call. = FALSE)
   newdata <- data.frame(newdata[, object$final_vars])
   predict(object$final_fit, newdata = newdata, ...)

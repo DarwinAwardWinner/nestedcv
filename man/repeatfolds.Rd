@@ -31,7 +31,7 @@ set.seed(123, "L'Ecuyer-CMRG")
 folds <- repeatfolds(y, repeats = 3, n_outer_folds = 4)
 
 res <- nestcv.glmnet(y, x, family = "multinomial", alphaSet = 1,
-                     n_outer_folds = 4, cv.cores = 2) |>
+                     n_outer_folds = 4) |>
        repeatcv(3, repeat_folds = folds)
 res
 }
