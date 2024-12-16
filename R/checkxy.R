@@ -12,7 +12,12 @@ checkxy <- function(y, x, na.option = "pass", weights = NULL) {
   naxc <- !complete.cases(t(x))
   okr <- rep.int(TRUE, NROW(y))
   okc <- rep.int(TRUE, ncol(x))
-  if (na.option == "omit") {
+  if (na.option == "fail") {
+    if (sum(nay) == 1) {stop("1 observation in 'y' contains NA")
+    } else if (sum(nay) > 1) stop(sum(nay), " observations in 'y' contain NA")
+    if (sum(naxr) == 1) {stop("1 row in 'x' contains NA")
+    } else if (sum(naxr) > 1) stop(sum(naxr), " rows in 'x' contain NA")
+  } else if (na.option == "omit") {
     if (sum(naxr) == 1) {message("1 row in 'x' contains NA")
     } else if (sum(naxr) > 1) message(sum(naxr), " rows in 'x' contain NA")
     okr <- !nay & !naxr
