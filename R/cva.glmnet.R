@@ -1,8 +1,13 @@
 
 #' Cross-validation of alpha for glmnet
-#' 
-#' Performs k-fold cross-validation for glmnet, including alpha mixing parameter.
-#' 
+#'
+#' Performs k-fold cross-validation for glmnet, including alpha mixing
+#' parameter.
+#'
+#' @details Nested parallelisation is performed over `alphaSet` and then over
+#'   the folds using the future framework. (Parallelization over lambda is not
+#'   necessary due to the way glmnet works. See [glmnet::glmnet()].)
+#'
 #' @param x Matrix of predictors
 #' @param y Response vector
 #' @param nfolds Number of folds (default 10)
@@ -29,12 +34,17 @@ cva.glmnet <- function(x, y, nfolds = 10, alphaSet = seq(0.1, 1, 0.1),
   if (is.null(foldid)) {
     foldid <- sample(rep(seq_len(nfolds), length = NROW(y)))
   }
-  fit1 <- cv.glmnet(x = x, y = y, 
-                    alpha = tail(alphaSet, 1), foldid = foldid, ...)
+  local_registerDoFuture()
+  # Use run cv.glmnet inside a "useless" future_lapply here so that it is always
+  # run at the same future parallel nesting level.
+  fit1 <- future_lapply(tail(alphaSet, 1), function(alpha) {
+    cv.glmnet(x = x, y = y,
+              alpha = alpha, foldid = foldid, ..., parallel = TRUE)
+  })[[1]]
   if (length(alphaSet) > 1) {
-    fits <- lapply(alphaSet[1:(length(alphaSet)-1)], function(alpha) {
-      cv.glmnet(x = x, y = y, 
-                alpha = alpha, foldid = foldid, lambda = fit1$lambda, ...)
+    fits <- future_lapply(alphaSet[1:(length(alphaSet)-1)], function(alpha) {
+      cv.glmnet(x = x, y = y,
+                alpha = alpha, foldid = foldid, lambda = fit1$lambda, ..., parallel = TRUE)
     })
     fits <- append(fits, list(fit1))
   } else fits <- list(fit1)

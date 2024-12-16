@@ -31,7 +31,13 @@ objects for each value of alpha and \code{alphaSet}.
 \item{which_alpha}{Index of \code{alphaSet} with lowest \code{alpha_cvm}}
 }
 \description{
-Performs k-fold cross-validation for glmnet, including alpha mixing parameter.
+Performs k-fold cross-validation for glmnet, including alpha mixing
+parameter.
+}
+\details{
+Nested parallelisation is performed over \code{alphaSet} and then over
+the folds using the future framework. (Parallelization over lambda is not
+necessary due to the way glmnet works. See \code{\link[glmnet:glmnet]{glmnet::glmnet()}}.)
 }
 \seealso{
 \link[glmnet:cv.glmnet]{glmnet::cv.glmnet}, \link[glmnet:glmnet]{glmnet::glmnet}
