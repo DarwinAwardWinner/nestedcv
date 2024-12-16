@@ -26,6 +26,8 @@ Encoding: UTF-8
 Imports:
     caret,
     data.table,
+    doFuture,
+    foreach,
     future,
     future.apply,
     ggplot2,
