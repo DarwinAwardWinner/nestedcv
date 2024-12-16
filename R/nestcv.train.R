@@ -577,6 +577,24 @@ summary_vars <- function(x) {
 }
 
 
+#' Convert testing folds to training folds and *vice versa*
+#'
+#' @param folds List of folds such as that created by [caret::createFolds()]
+#' @param len Number of observations in the data. This is only required if not
+#'   all indices are present in `folds`.
+#'
+#' @return A list the same length as `folds`, with the indices inverted: if the
+#'   input was test folds, then the output is training folds, and *vice versa*.
+#' @export
+#'
+#' @examples
+#' set.seed(1986)
+#' test_folds <- caret::createFolds(1:10, k = 3)
+#' train_folds <- swapFoldIndex(test_folds)
+#' lengths(test_folds)
+#' lengths(train_folds)
+#' # Together, they add up to all 10 samples
+#' lengths(test_folds) + lengths(train_folds)
 swapFoldIndex <- function(folds, len = max(unlist(folds))) {
   lapply(folds, function(i) setdiff(seq_len(len), i))
 }
