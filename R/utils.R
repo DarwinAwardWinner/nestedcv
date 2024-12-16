@@ -67,3 +67,14 @@ inspectGrid <- function(method, tuneLength = 3, y = NA, x = NA) {
 spaces <- function(n) {
   paste0(rep(" ", n), collapse = "")
 }
+
+#' @importFrom doFuture registerDoFuture
+
+# Function to registerDoFuture() until end of the current function, after which
+# the original foreach backend will be restored.
+local_registerDoFuture <- withr::local_(
+  set = registerDoFuture,
+  reset = function(old_dopar) {
+    do.call(foreach::setDoPar, old_dopar)
+  }
+)
