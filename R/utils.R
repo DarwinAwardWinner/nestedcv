@@ -76,5 +76,6 @@ local_registerDoFuture <- withr::local_(
   set = registerDoFuture,
   reset = function(old_dopar) {
     do.call(foreach::setDoPar, old_dopar)
-  }
+  },
+  get = \(...) getNamespace("doFuture")$.getDoPar()
 )
