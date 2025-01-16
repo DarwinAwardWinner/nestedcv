@@ -250,6 +250,9 @@ nestcv.train <- function(y, x,
   if (is.character(y)) y <- factor(y)
   if (!is.null(balance) & is.numeric(y)) {
     stop("`balance` can only be used for classification")}
+  stopifnot(length(finalCV) == 1 && is.logical(finalCV))
+  stopifnot(length(verbose) == 1 && is.logical(verbose) && !is.na(verbose))
+  stopifnot(length(modifyX_useY) == 1 && is.logical(modifyX_useY) && !is.na(modifyX_useY))
   ok <- checkxy(y, x, na.option, weights)
   if (any(!ok$r) && (!is.null(outer_folds) || !is.null(inner_folds))) {
     stop("If manually created folds are provided, observations cannot be filtered out due to missing data.")
